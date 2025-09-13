@@ -1,4 +1,3 @@
-import pytest
 from mini_lm.bpe.word import Word, Symbol
 
 

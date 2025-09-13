@@ -9,7 +9,7 @@ import time
 import numpy as np
 from pathlib import Path
 from mini_lm.bpe.bpe_model import BpeModel
-from encode_large_file_utils import encode_file_streaming, estimate_memory_usage
+from .encode_large_file_utils import encode_file_streaming, estimate_memory_usage
 
 def load_tinystories_valid_tokenizer() -> BpeModel:
     """
