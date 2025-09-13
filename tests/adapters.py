@@ -11,7 +11,7 @@ from torch import Tensor
 
 from mini_lm.bpe.bpe_trainer import BpeTrainer
 from mini_lm.bpe.bpe_model import BpeModel
-from mini_lm.nn.nn_basic import Linear
+from mini_lm.nn.nn_basic import Linear, Embedding
 
 
 def run_linear(
@@ -57,7 +57,14 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    raise NotImplementedError
+    embedding_layer= Embedding(
+        num_embeddings=vocab_size,
+        embedding_dim=d_model,
+        device=token_ids.device,
+        dtype=weights.dtype,
+    )
+    embedding_layer.load_state_dict({"weight": weights})
+    return embedding_layer(token_ids)
 
 
 def run_swiglu(
