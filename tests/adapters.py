@@ -11,7 +11,7 @@ from torch import Tensor
 
 from mini_lm.bpe.bpe_trainer import BpeTrainer
 from mini_lm.bpe.bpe_model import BpeModel
-from mini_lm.nn.nn_basic import Linear, Embedding, RMSNorm
+from mini_lm.nn import Linear, Embedding, RMSNorm, SwiGLU
 
 
 def run_linear(
@@ -92,11 +92,15 @@ def run_swiglu(
     # Example:
     # If your state dict keys match, you can use `load_state_dict()`
     # swiglu.load_state_dict(weights)
+    swighlu = SwiGLU(d_model, d_ff, device=in_features.device, dtype=in_features.dtype)
+    swighlu.load_state_dict(
+        {"w1": w1_weight, "w2": w2_weight, "w3": w3_weight}
+    )
+    return swighlu(in_features)
     # You can also manually assign the weights
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
 
 
 def run_scaled_dot_product_attention(
