@@ -1,4 +1,4 @@
 from .linear import Linear
 from .embedding import Embedding, RotaryPositionEmbedding
 from .normalization import RMSNorm
-from .activation import SwiGLU
+from .activation import Softmax, SwiGLU

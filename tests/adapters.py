@@ -11,7 +11,7 @@ from torch import Tensor
 
 from mini_lm.bpe.bpe_trainer import BpeTrainer
 from mini_lm.bpe.bpe_model import BpeModel
-from mini_lm.nn import Linear, Embedding, RMSNorm, SwiGLU
+from mini_lm.nn import Linear, Embedding, RMSNorm, SwiGLU, Softmax
 
 
 def run_linear(
@@ -462,7 +462,8 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    softmax = Softmax(dim=dim, device=in_features.device, dtype=in_features.dtype)
+    return softmax(in_features)
 
 
 def run_cross_entropy(
