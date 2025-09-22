@@ -11,7 +11,14 @@ from torch import Tensor
 
 from mini_lm.bpe.bpe_trainer import BpeTrainer
 from mini_lm.bpe.bpe_model import BpeModel
-from mini_lm.nn import Linear, Embedding, RMSNorm, SwiGLU, Softmax
+from mini_lm.nn import (
+    Linear,
+    Embedding,
+    RMSNorm,
+    SwiGLU,
+    Softmax,
+    ScaledDotProductAttention,
+)
 
 
 def run_linear(
@@ -57,7 +64,7 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    embedding_layer= Embedding(
+    embedding_layer = Embedding(
         num_embeddings=vocab_size,
         embedding_dim=d_model,
         device=token_ids.device,
@@ -93,9 +100,7 @@ def run_swiglu(
     # If your state dict keys match, you can use `load_state_dict()`
     # swiglu.load_state_dict(weights)
     swighlu = SwiGLU(d_model, d_ff, device=in_features.device, dtype=in_features.dtype)
-    swighlu.load_state_dict(
-        {"w1": w1_weight, "w2": w2_weight, "w3": w3_weight}
-    )
+    swighlu.load_state_dict({"w1": w1_weight, "w2": w2_weight, "w3": w3_weight})
     return swighlu(in_features)
     # You can also manually assign the weights
     # swiglu.w1.weight.data = w1_weight
@@ -121,7 +126,8 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    scaled_dot_product_attention = ScaledDotProductAttention()
+    return scaled_dot_product_attention(Q, K, V, mask)
 
 
 def run_multihead_self_attention(
@@ -218,15 +224,12 @@ def run_rope(
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
     from mini_lm.nn import RotaryPositionEmbedding
-    
+
     # Create RoPE module
     rope = RotaryPositionEmbedding(
-        theta=theta,
-        d_k=d_k,
-        max_seq_len=max_seq_len,
-        device=in_query_or_key.device
+        theta=theta, d_k=d_k, max_seq_len=max_seq_len, device=in_query_or_key.device
     )
-    
+
     # Apply RoPE to the input tensor
     return rope(in_query_or_key, token_positions)
 
@@ -406,7 +409,7 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    
+
     rmsnorm = RMSNorm(d_model, eps, device=in_features.device, dtype=in_features.dtype)
     rmsnorm.load_state_dict({"gain": weights})
     return rmsnorm(in_features)
