@@ -14,12 +14,12 @@ from mini_lm.bpe.bpe_model import BpeModel
 from mini_lm.nn import (
     Linear,
     Embedding,
-    RotaryPositionEmbedding,
     RMSNorm,
     SwiGLU,
     Softmax,
     ScaledDotProductAttention,
     MultiHeadAttention,
+    MultiHeadAttentionWithRope,
 )
 
 
@@ -214,78 +214,19 @@ def run_multihead_self_attention_with_rope(
         implementation with the given QKV projection weights and input features.
     """
     # Create linear layers for projections
-    q_proj = torch.nn.Linear(d_model, d_model, bias=False)
-    k_proj = torch.nn.Linear(d_model, d_model, bias=False)
-    v_proj = torch.nn.Linear(d_model, d_model, bias=False)
-    o_proj = torch.nn.Linear(d_model, d_model, bias=False)
+    mh_attention_rope = MultiHeadAttentionWithRope(d_model, num_heads, max_seq_len, theta)
 
     # Load weights
-    q_proj.weight.data = q_proj_weight
-    k_proj.weight.data = k_proj_weight
-    v_proj.weight.data = v_proj_weight
-    o_proj.weight.data = o_proj_weight
+    mh_attention_rope.load_state_dict(
+        {
+            "w_q.weight": q_proj_weight,
+            "w_k.weight": k_proj_weight,
+            "w_v.weight": v_proj_weight,
+            "w_o.weight": o_proj_weight,
+        }
+    )
 
-    batch_size, seq_len, _ = in_features.shape
-    if token_positions is None:
-        token_positions = (
-            torch.arange(seq_len, device=in_features.device)
-            .unsqueeze(0)
-            .expand(batch_size, -1)
-        )
-
-    # Apply linear projections
-    Q = q_proj(in_features)  # (batch_size, seq_len, d_model)
-    K = k_proj(in_features)  # (batch_size, seq_len, d_model)
-    V = v_proj(in_features)  # (batch_size, seq_len, d_model)
-
-    # Reshape for multi-head attention
-    head_dim = d_model // num_heads
-    Q = Q.view(batch_size, seq_len, num_heads, head_dim)
-    K = K.view(batch_size, seq_len, num_heads, head_dim)
-    V = V.view(batch_size, seq_len, num_heads, head_dim)
-    
-    # Transpose to (batch_size, num_heads, seq_len, head_dim) for RoPE application
-    # This allows us to treat num_heads as a batch dimension
-    Q = Q.permute(0, 2, 1, 3)  # (batch_size, num_heads, seq_len, head_dim)
-    K = K.permute(0, 2, 1, 3)  # (batch_size, num_heads, seq_len, head_dim)
-    V = V.permute(0, 2, 1, 3)  # (batch_size, num_heads, seq_len, head_dim)
-    
-    # Reshape to combine batch and head dimensions for RoPE
-    Q = Q.reshape(batch_size * num_heads, seq_len, head_dim)
-    K = K.reshape(batch_size * num_heads, seq_len, head_dim)
-    
-    # Apply RoPE to Q and K (not V)
-    rope = RotaryPositionEmbedding(theta=theta, d_k=head_dim, max_seq_len=max_seq_len)
-    
-    # Expand token_positions to match the combined batch dimension
-    token_positions_expanded = token_positions.unsqueeze(1).expand(batch_size, num_heads, seq_len)
-    token_positions_expanded = token_positions_expanded.reshape(batch_size * num_heads, seq_len)
-    
-    Q = rope(Q, token_positions_expanded)
-    K = rope(K, token_positions_expanded)
-    
-    # Reshape back to separate batch and head dimensions
-    Q = Q.view(batch_size, num_heads, seq_len, head_dim)
-    K = K.view(batch_size, num_heads, seq_len, head_dim)
-
-    # Compute attention scores
-    scores = torch.matmul(Q, K.transpose(-2, -1)) / (head_dim**0.5)
-
-    # Apply causal mask
-    mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool().to(scores.device)
-    scores = scores.masked_fill(mask, float("-inf"))
-
-    # Apply softmax
-    attn = torch.nn.functional.softmax(scores, dim=-1)
-
-    # Apply attention to values
-    output = torch.matmul(attn, V)  # (batch_size, num_heads, seq_len, head_dim)
-
-    # Reshape back
-    output = output.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, d_model)
-
-    # Apply output projection
-    return o_proj(output)
+    return mh_attention_rope(in_features, in_features, in_features, token_positions=token_positions)
 
 
 def run_rope(
