@@ -20,6 +20,7 @@ from mini_lm.nn import (
     ScaledDotProductAttention,
     MultiHeadAttention,
     MultiHeadAttentionWithRope,
+    TransformerBlock,
 )
 
 
@@ -214,7 +215,9 @@ def run_multihead_self_attention_with_rope(
         implementation with the given QKV projection weights and input features.
     """
     # Create linear layers for projections
-    mh_attention_rope = MultiHeadAttentionWithRope(d_model, num_heads, max_seq_len, theta)
+    mh_attention_rope = MultiHeadAttentionWithRope(
+        d_model, num_heads, max_seq_len, theta
+    )
 
     # Load weights
     mh_attention_rope.load_state_dict(
@@ -226,7 +229,9 @@ def run_multihead_self_attention_with_rope(
         }
     )
 
-    return mh_attention_rope(in_features, in_features, in_features, token_positions=token_positions)
+    return mh_attention_rope(
+        in_features, in_features, in_features, token_positions=token_positions
+    )
 
 
 def run_rope(
@@ -329,7 +334,33 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    transformer_block = TransformerBlock(d_model, num_heads, d_ff, max_seq_len, theta)
+
+    transformer_block.attention.load_state_dict(
+        {
+            "w_q.weight": weights["attn.q_proj.weight"],
+            "w_k.weight": weights["attn.k_proj.weight"],
+            "w_v.weight": weights["attn.v_proj.weight"],
+            "w_o.weight": weights["attn.output_proj.weight"],
+        }
+    )
+
+    transformer_block.norm1.load_state_dict(
+        {"gain": weights["ln1.weight"]},
+    )
+    transformer_block.norm2.load_state_dict(
+        {"gain": weights["ln2.weight"]},
+    )
+
+    transformer_block.ffn.load_state_dict(
+        {
+            "w1": weights["ffn.w1.weight"],
+            "w2": weights["ffn.w2.weight"],
+            "w3": weights["ffn.w3.weight"],
+        }
+    )
+
+    return transformer_block(in_features)
 
 
 def run_transformer_lm(
