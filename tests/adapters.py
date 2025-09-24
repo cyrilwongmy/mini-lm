@@ -18,6 +18,7 @@ from mini_lm.nn import (
     SwiGLU,
     Softmax,
     ScaledDotProductAttention,
+    MultiHeadAttention,
 )
 
 
@@ -161,7 +162,17 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    mh_attetion = MultiHeadAttention(d_model, num_heads)
+    mh_attetion.load_state_dict(
+        {
+            "w_q.weight": q_proj_weight,
+            "w_k.weight": k_proj_weight,
+            "w_v.weight": v_proj_weight,
+            "w_o.weight": o_proj_weight,
+        }
+    )
+
+    return mh_attetion(in_features, in_features, in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -201,7 +212,50 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    mh_attention = MultiHeadAttention(d_model, num_heads)
+    mh_attention.w_q.weight.data = q_proj_weight
+    mh_attention.w_q.bias.data.zero_()
+    mh_attention.w_k.weight.data = k_proj_weight
+    mh_attention.w_k.bias.data.zero_()
+    mh_attention.w_v.weight.data = v_proj_weight
+    mh_attention.w_v.bias.data.zero_()
+
+    from mini_lm.nn import RotaryPositionEmbedding
+
+    rope = RotaryPositionEmbedding(
+        theta=theta, d_k=d_model, max_seq_len=max_seq_len
+    )
+    
+    batch_size, seq_len, _ = in_features.shape
+    if token_positions is None:
+        token_positions = (
+            torch.arange(seq_len, device=in_features.device)
+            .unsqueeze(0)
+            .expand(batch_size, -1)
+        )
+
+    # Apply RoPE before splitting into heads
+    q_rope = rope(mh_attention.w_q(in_features), token_positions)
+    k_rope = rope(mh_attention.w_k(in_features), token_positions)
+    v = mh_attention.w_v(in_features)
+
+    # Reshape for multi-head attention
+    q_rope = q_rope.view(
+        batch_size, seq_len, num_heads, d_model // num_heads
+    ).permute(0, 2, 1, 3)
+    k_rope = k_rope.view(
+        batch_size, seq_len, num_heads, d_model // num_heads
+    ).permute(0, 2, 1, 3)
+    v = v.view(batch_size, seq_len, num_heads, d_model // num_heads).permute(0, 2, 1, 3)
+
+    output = mh_attention(q_rope, k_rope, v)
+    output = output.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, -1)
+
+    o_proj = torch.nn.Linear(d_model, d_model)
+    o_proj.weight.data = o_proj_weight
+    o_proj.bias.data.zero_()
+
+    return o_proj(output)
 
 
 def run_rope(

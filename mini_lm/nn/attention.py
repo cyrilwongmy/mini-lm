@@ -1,4 +1,4 @@
-from torch.nn import Module
+from torch.nn import Module, Linear
 import torch
 from torch import Tensor
 from typing import Optional, Tuple
@@ -41,3 +41,36 @@ class ScaledDotProductAttention(Module):
 
         output = torch.einsum("...qk,...kd->...qd", attn, V)
         return output
+
+class MultiHeadAttention(Module):
+    def __init__(self, d_model:int, num_heads:int):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        # Following Vaswani et al. (2017), d_k = d_v = d_model / num_heads
+        self.k_dim = d_model // num_heads
+        self.v_dim = d_model // num_heads
+        self.w_q = Linear(d_model, d_model)
+        self.w_k = Linear(d_model, d_model)
+        self.w_v = Linear(d_model, d_model)
+        self.w_o = Linear(d_model, d_model)
+        self.softmax = Softmax(dim=-1)
+    
+    def forward(self, query, key, value):
+        batch_size, seq_len, _ = query.size()
+        # Linear projections
+        Q = self.w_q(query)
+        K = self.w_k(key)
+        V = self.w_v(value)
+
+        Q = Q.view(batch_size, seq_len, self.num_heads, self.k_dim).permute(0, 2, 1, 3)  # (batch_size, num_heads, seq_len, k_dim)
+        K = K.view(batch_size, seq_len, self.num_heads, self.k_dim).permute(0, 2, 1, 3)  # (batch_size, num_heads, seq_len, k_dim)
+        V = V.view(batch_size, seq_len, self.num_heads, self.v_dim).permute(0, 2, 1, 3)  # (batch_size, num_heads, seq_len, v_dim)
+
+        K = K.transpose(-2, -1)  # (batch_size, num_heads, k_dim, seq_len)
+
+        scores = torch.matmul(Q, K) / (self.k_dim ** 0.5)  # (batch_size, num_heads, seq_len, seq_len)
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool().to(query.device)
+        scores = scores.masked_fill(mask == True, float("-inf"))
+        attn = self.softmax(scores)  # (batch_size, num_heads, seq_len, seq_len)
+        output = torch.matmul(attn, V)  # (batch_size, num_heads, seq_len, v_dim)
+        return output.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, -1)  # (batch_size, seq_len, d_model)
