@@ -49,10 +49,10 @@ class MultiHeadAttention(Module):
         # Following Vaswani et al. (2017), d_k = d_v = d_model / num_heads
         self.k_dim = d_model // num_heads
         self.v_dim = d_model // num_heads
-        self.w_q = Linear(d_model, d_model)
-        self.w_k = Linear(d_model, d_model)
-        self.w_v = Linear(d_model, d_model)
-        self.w_o = Linear(d_model, d_model)
+        self.w_q = Linear(d_model, d_model, bias=False)
+        self.w_k = Linear(d_model, d_model, bias=False)
+        self.w_v = Linear(d_model, d_model, bias=False)
+        self.w_o = Linear(d_model, d_model, bias=False)
         self.softmax = Softmax(dim=-1)
     
     def forward(self, query, key, value):
@@ -73,4 +73,5 @@ class MultiHeadAttention(Module):
         scores = scores.masked_fill(mask == True, float("-inf"))
         attn = self.softmax(scores)  # (batch_size, num_heads, seq_len, seq_len)
         output = torch.matmul(attn, V)  # (batch_size, num_heads, seq_len, v_dim)
-        return output.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, -1)  # (batch_size, seq_len, d_model)
+        output = output.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, -1)  # (batch_size, seq_len, d_model)
+        return self.w_o(output)  # Apply output projection
