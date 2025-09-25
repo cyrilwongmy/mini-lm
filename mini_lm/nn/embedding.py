@@ -8,28 +8,28 @@ from jaxtyping import Float, Int
 class Embedding(Module):
     def __init__(
         self,
-        num_embeddings: int,
-        embedding_dim: int,
+        vocab_size: int,
+        d_model: int,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
         """Embedding layer mapping indices to dense vectors.
 
         Args:
-            num_embeddings (int): Size of the dictionary of embeddings.
-            embedding_dim (int): Dimension of each embedding vector.
+            vocab_size (int): Size of the dictionary of embeddings. a.k.a. num_embeddings.
+            d_model (int): Dimension of each embedding vector. a.k.a. embedding_dim.
             device (torch.device | None, optional): Device to store the parameters on.
             dtype (torch.dtype | None, optional): Data type of the parameters.
         """
         super(Embedding, self).__init__()
-        self.num_embeddings = num_embeddings
-        self.embedding_dim = embedding_dim
+        self.num_embeddings = vocab_size
+        self.embedding_dim = d_model
 
         mean, variance = 0.0, 1
         std = variance**0.5
         self.weight = Parameter(
             torch.nn.init.trunc_normal_(
-                torch.empty(num_embeddings, embedding_dim, device=device, dtype=dtype),
+                torch.empty(vocab_size, d_model, device=device, dtype=dtype),
                 mean=mean,
                 std=std,
                 a=-3,
