@@ -65,8 +65,11 @@ class Transformer(Module):
         self.linear = Linear(self.d_model, vocab_size)
         self.softmax = Softmax(dim=-1)
 
-    def forward(self, x):
+    def forward(self, x, return_logits=False):
         x = self.embedding(x)
         for layer in self.layers:
             x = layer(x)
-        return self.softmax(self.linear(self.norm(x)))
+        logits = self.linear(self.norm(x))
+        if return_logits:
+            return logits
+        return self.softmax(logits)

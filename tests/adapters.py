@@ -485,14 +485,8 @@ def run_transformer_lm(
         "weight": weights["lm_head.weight"]
     })
     
-    # Forward pass - but we need to return logits without softmax
-    x = transformer.embedding(in_indices)
-    for layer in transformer.layers:
-        x = layer(x)
-    x = transformer.norm(x)
-    logits = transformer.linear(x)
-    
-    return logits
+    # Forward pass - return logits without softmax
+    return transformer(in_indices, return_logits=True)
 
 
 def run_rmsnorm(
