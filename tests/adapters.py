@@ -21,6 +21,7 @@ from mini_lm.nn import (
     MultiHeadAttention,
     MultiHeadAttentionWithRope,
     TransformerBlock,
+    Transformer,
 )
 
 
@@ -442,7 +443,56 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    transformer = Transformer(vocab_size, context_length, d_model, num_layers, num_heads, d_ff, rope_theta)
+    
+    # Load token embeddings
+    transformer.embedding.load_state_dict({
+        "weight": weights["token_embeddings.weight"]
+    })
+    
+    # Load weights for each transformer layer
+    for i in range(num_layers):
+        # Load attention weights
+        transformer.layers[i].attention.load_state_dict({
+            "w_q.weight": weights[f"layers.{i}.attn.q_proj.weight"],
+            "w_k.weight": weights[f"layers.{i}.attn.k_proj.weight"],
+            "w_v.weight": weights[f"layers.{i}.attn.v_proj.weight"],
+            "w_o.weight": weights[f"layers.{i}.attn.output_proj.weight"],
+        })
+        
+        # Load layer norm weights
+        transformer.layers[i].norm1.load_state_dict({
+            "gain": weights[f"layers.{i}.ln1.weight"]
+        })
+        transformer.layers[i].norm2.load_state_dict({
+            "gain": weights[f"layers.{i}.ln2.weight"]
+        })
+        
+        # Load feed-forward weights
+        transformer.layers[i].ffn.load_state_dict({
+            "w1": weights[f"layers.{i}.ffn.w1.weight"],
+            "w2": weights[f"layers.{i}.ffn.w2.weight"],
+            "w3": weights[f"layers.{i}.ffn.w3.weight"],
+        })
+    
+    # Load final layer norm
+    transformer.norm.load_state_dict({
+        "gain": weights["ln_final.weight"]
+    })
+    
+    # Load language model head
+    transformer.linear.load_state_dict({
+        "weight": weights["lm_head.weight"]
+    })
+    
+    # Forward pass - but we need to return logits without softmax
+    x = transformer.embedding(in_indices)
+    for layer in transformer.layers:
+        x = layer(x)
+    x = transformer.norm(x)
+    logits = transformer.linear(x)
+    
+    return logits
 
 
 def run_rmsnorm(
