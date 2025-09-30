@@ -1,4 +1,6 @@
 import math
+import torch
+from typing import Iterable
 
 
 def get_cosine_schedule_with_warmup(
@@ -33,3 +35,44 @@ def get_cosine_schedule_with_warmup(
     else:
         # Post-annealing phase
         return min_learning_rate
+
+
+def clip_grad_norm_(
+    parameters: Iterable[torch.nn.Parameter],
+    max_norm: float,
+    eps: float = 1e-6
+) -> float:
+    """
+    Clips gradient norm of an iterable of parameters.
+    
+    The norm is computed over all gradients together, as if they were
+    concatenated into a single vector. Gradients are modified in-place.
+    
+    Args:
+        parameters: An iterable of torch.nn.Parameter
+        max_norm: Maximum L2 norm of the gradients
+        eps: Small value for numerical stability (default: 1e-6)
+    
+    Returns:
+        Total norm of the parameters (viewed as a single vector)
+    """
+    # Filter out parameters without gradients
+    parameters = [p for p in parameters if p.grad is not None]
+    
+    if len(parameters) == 0:
+        return 0.0
+    
+    # Compute the L2 norm of all gradients
+    total_norm = 0.0
+    for p in parameters:
+        param_norm = p.grad.data.norm(2).item()
+        total_norm += param_norm ** 2
+    total_norm = total_norm ** 0.5
+    
+    # Clip gradients if necessary
+    if total_norm > max_norm:
+        clip_coef = max_norm / (total_norm + eps)
+        for p in parameters:
+            p.grad.data.mul_(clip_coef)
+    
+    return total_norm
