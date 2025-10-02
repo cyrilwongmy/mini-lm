@@ -414,6 +414,7 @@ def train(args: argparse.Namespace):
     # Training loop
     model.train()
     for iteration in range(start_iteration, config.num_iterations):
+        logger.info(f"iteration: {iteration}")
         # Get learning rate for this iteration
         lr = get_cosine_schedule_with_warmup(
             iteration,
