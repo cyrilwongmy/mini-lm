@@ -1,0 +1,54 @@
+# Configuration for TinyStories model training
+# Model: 512d, 4 layers, 16 heads
+# Target: ~327,680,000 tokens processed
+
+# Model architecture
+model_name: "mini-lm"
+model_size: "custom_512d_4L"
+vocab_size: 10000
+context_length: 256
+d_model: 512
+num_layers: 4
+num_heads: 16
+d_ff: 1344
+rope_theta: 10000.0
+
+# Training configuration
+dataset: "tinystories"
+batch_size: 64  # Will process 64 * 256 = 16,384 tokens per step
+gradient_accumulation_steps: 4  # Effective batch size: 256
+learning_rate: 3.0e-4  # Standard for small transformers
+min_learning_rate: 3.0e-5  # 10% of max LR
+warmup_steps: 2000  # ~10% of total steps
+weight_decay: 0.1  # Standard for transformers
+grad_clip: 1.0
+num_iterations: 5000  # 5k iterations * 4 grad_accum * 64 batch * 256 context = 327,680,000 tokens
+mixed_precision: true
+
+# AdamW hyperparameters (standard values)
+beta1: 0.9
+beta2: 0.999
+eps: 1.0e-8
+
+# Experiment metadata
+experiment_type: "baseline"
+experiment_name: "tinystories_512d_4L_16H_327M_tokens"
+tags:
+  - "tinystories"
+  - "512d"
+  - "4L_16H"
+  - "327M_tokens"
+  - "baseline"
+notes: "Training 512d 4-layer 16-head model on TinyStories for 327.68M tokens"
+
+# Tracking configuration
+log_interval: 100  # Log every 100 gradient steps
+val_interval: 500  # Validate every 500 gradient steps
+val_iterations: 100  # Run 100 validation batches
+checkpoint_interval: 2000  # Save checkpoint every 2000 gradient steps
+track_memory: true  # Track GPU memory usage
+
+# W&B configuration
+wandb_project: "mini-lm"
+wandb_group: "tinystories_512d"
+wandb_job_type: "training"
