@@ -1,6 +1,6 @@
 # Configuration for TinyStories model training
 # Model: 512d, 4 layers, 16 heads
-# Target: ~327,680,000 tokens processed
+# Target: ~40,000,000 tokens processed
 
 # Model architecture
 model_name: "mini-lm"
@@ -15,14 +15,14 @@ rope_theta: 10000.0
 
 # Training configuration
 dataset: "tinystories"
-batch_size: 64  # Will process 64 * 256 = 16,384 tokens per step
-gradient_accumulation_steps: 4  # Effective batch size: 256
+batch_size: 32  # Will process 32 * 256 = 8,192 tokens per step
+gradient_accumulation_steps: 1  # No gradient accumulation needed
 learning_rate: 3.0e-4  # Standard for small transformers
 min_learning_rate: 3.0e-5  # 10% of max LR
-warmup_steps: 2000  # ~10% of total steps
+warmup_steps: 500  # ~10% of total steps
 weight_decay: 0.1  # Standard for transformers
 grad_clip: 1.0
-num_iterations: 5000  # 5k iterations * 4 grad_accum * 64 batch * 256 context = 327,680,000 tokens
+num_iterations: 5000  # 5k iterations * 1 grad_accum * 32 batch * 256 context = 40,960,000 tokens
 mixed_precision: true
 
 # AdamW hyperparameters (standard values)
@@ -32,20 +32,20 @@ eps: 1.0e-8
 
 # Experiment metadata
 experiment_type: "baseline"
-experiment_name: "tinystories_512d_4L_16H_327M_tokens"
+experiment_name: "tinystories_512d_4L_16H_40M_tokens"
 tags:
   - "tinystories"
   - "512d"
   - "4L_16H"
-  - "327M_tokens"
+  - "40M_tokens"
   - "baseline"
-notes: "Training 512d 4-layer 16-head model on TinyStories for 327.68M tokens"
+notes: "Training 512d 4-layer 16-head model on TinyStories for 40.96M tokens"
 
 # Tracking configuration
 log_interval: 100  # Log every 100 gradient steps
 val_interval: 500  # Validate every 500 gradient steps
 val_iterations: 100  # Run 100 validation batches
-checkpoint_interval: 2000  # Save checkpoint every 2000 gradient steps
+checkpoint_interval: 1000  # Save checkpoint every 1000 gradient steps
 track_memory: true  # Track GPU memory usage
 
 # W&B configuration

@@ -5,13 +5,13 @@
 CONFIG_FILE="experiments/configs/tinystories_512d_4L_16H.yaml"
 TRAIN_DATA="/Users/cyrilwong/github/mini_lm/data/TinyStories_train_token_ids.npy"
 VAL_DATA="/Users/cyrilwong/github/mini_lm/data/TinyStories_valid_token_ids.npy"
-NUM_ITERATIONS=500
-CHECKPOINT_DIR="checkpoints/tinystories_512d_4L_16H"
+NUM_ITERATIONS=5000
+CHECKPOINT_DIR="checkpoints/tinystories_512d_4L_16H_40M"
 DTYPE="int64"
 DEVICE="mps"
 
 # --- Run Training ---
-echo "Starting enhanced TinyStories model training..."
+echo "Starting TinyStories model training..."
 
 uv run python trainer.py \
     --config "${CONFIG_FILE}" \

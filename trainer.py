@@ -349,9 +349,13 @@ def train(args: argparse.Namespace):
         d_ff=config.d_ff,
         rope_theta=config.rope_theta
     ).to(device)
+
     
-    # Compile model if requested
-    if args.compile and hasattr(torch, 'compile'):
+    # Compile model if mps or requested
+    if args.device == "mps":
+        logger.info("Compiling model with torch.compile for MPS...")
+        model = torch.compile(model, backend="aot_eager")
+    elif args.compile and hasattr(torch, 'compile'):
         logger.info("Compiling model with torch.compile...")
         model = torch.compile(model)
     

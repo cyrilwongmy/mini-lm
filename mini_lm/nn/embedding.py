@@ -110,12 +110,16 @@ class RotaryPositionEmbedding(Module):
         """
 
         # Check if we need to update the cache
+        # Use tensor comparison to avoid .item() which breaks graph compilation
+        max_pos = token_positions.max()
         if (
             not hasattr(self, "max_seq_len_cached")
-            or token_positions.max().item() >= self.max_seq_len_cached
+            or max_pos >= self.max_seq_len_cached
         ):
+            # Convert to Python int only when necessary for cache update
+            max_pos_int = int(max_pos.item())
             self._update_cache(
-                max(token_positions.max().item() + 1, self.max_seq_len), x.device
+                max(max_pos_int + 1, self.max_seq_len), x.device
             )
 
         # Handle broadcasting: if token_positions has fewer dimensions than x, expand it
