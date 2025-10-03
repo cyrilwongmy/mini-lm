@@ -109,19 +109,6 @@ class RotaryPositionEmbedding(Module):
             Tensor of same shape as x with rotary position embedding applied
         """
 
-        # Check if we need to update the cache
-        # Use tensor comparison to avoid .item() which breaks graph compilation
-        max_pos = token_positions.max()
-        if (
-            not hasattr(self, "max_seq_len_cached")
-            or max_pos >= self.max_seq_len_cached
-        ):
-            # Convert to Python int only when necessary for cache update
-            max_pos_int = int(max_pos.item())
-            self._update_cache(
-                max(max_pos_int + 1, self.max_seq_len), x.device
-            )
-
         # Handle broadcasting: if token_positions has fewer dimensions than x, expand it
         # This handles the case where pos_ids is 1D but x has batch dimensions
         if token_positions.dim() < x.dim() - 1:
@@ -137,12 +124,23 @@ class RotaryPositionEmbedding(Module):
         # cos_cached and sin_cached have shape [max_positions, d_k]
         # token_positions has shape [..., seq_len]
         # We need to index into the first dimension of cos/sin_cached
-        cpu_token_positions = token_positions.to("cpu")
-        cos = self.cos_cached[cpu_token_positions]  # [..., seq_len, d_k]
-        sin = self.sin_cached[cpu_token_positions]  # [..., seq_len, d_k]
+        
+        # Clamp token_positions to ensure they're within the cached range
+        # This avoids the need for dynamic cache updates during forward pass
+        max_cached_pos = self.cos_cached.size(0) - 1
+        token_positions = torch.clamp(token_positions, min=0, max=max_cached_pos)
+        
+        # Ensure token_positions is on the same device as the cached tensors for indexing
+        if token_positions.device != self.cos_cached.device:
+            token_positions = token_positions.to(self.cos_cached.device)
+        
+        cos = self.cos_cached[token_positions]  # [..., seq_len, d_k]
+        sin = self.sin_cached[token_positions]  # [..., seq_len, d_k]
 
-        cos = cos.to(x.device)
-        sin = sin.to(x.device)
+        # Move cos and sin to the same device as x if needed
+        if cos.device != x.device:
+            cos = cos.to(x.device)
+            sin = sin.to(x.device)
 
         # Apply rotary embedding
         # RoPE applies rotation to consecutive pairs: (x0,x1), (x2,x3), etc.

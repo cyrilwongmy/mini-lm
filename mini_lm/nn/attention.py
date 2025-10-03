@@ -105,6 +105,13 @@ class MultiHeadAttentionWithRope(Module):
         self.w_v = Linear(d_model, d_model)
         self.w_o = Linear(d_model, d_model)
         self.softmax = Softmax(dim=-1)
+        
+        # Initialize RoPE once in __init__ to avoid recreating it on every forward pass
+        self.rope = RotaryPositionEmbedding(
+            theta=self.theta,
+            d_k=self.k_dim,
+            max_seq_len=self.max_seq_len
+        )
 
     def forward(self, query, key, value, token_positions: Optional[Tensor] = None):
         batch_size, seq_len, _ = query.shape
@@ -136,10 +143,6 @@ class MultiHeadAttentionWithRope(Module):
         K = K.reshape(batch_size * self.num_heads, seq_len, self.k_dim)
 
         # Apply RoPE to Q and K (not V)
-        rope = RotaryPositionEmbedding(
-            theta=self.theta, d_k=self.k_dim, max_seq_len=self.max_seq_len
-        )
-
         # Expand token_positions to match the combined batch dimension
         token_positions_expanded = token_positions.unsqueeze(1).expand(
             batch_size, self.num_heads, seq_len
@@ -148,8 +151,8 @@ class MultiHeadAttentionWithRope(Module):
             batch_size * self.num_heads, seq_len
         )
 
-        Q = rope(Q, token_positions_expanded)
-        K = rope(K, token_positions_expanded)
+        Q = self.rope(Q, token_positions_expanded)
+        K = self.rope(K, token_positions_expanded)
 
         # Reshape back to separate batch and head dimensions
         Q = Q.view(batch_size, self.num_heads, seq_len, self.k_dim)
