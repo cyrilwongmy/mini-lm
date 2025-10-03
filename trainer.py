@@ -149,7 +149,7 @@ def parse_args():
     # Device arguments
     device_group = parser.add_argument_group("Device")
     device_group.add_argument("--device", type=str, default="cuda",
-                             help="Device to use (cuda/cpu)")
+                             help="Device to use (cuda/cpu/mps)")
     device_group.add_argument("--compile", action="store_true",
                              help="Use torch.compile for optimization")
     
@@ -331,7 +331,7 @@ def train(args: argparse.Namespace):
     if device.type == "cuda":
         logger.info(f"Using GPU: {torch.cuda.get_device_name()}")
     else:
-        logger.info("Using CPU")
+        logger.info(f"Using {args.device}")
     
     if torch.amp.autocast_mode.is_autocast_available(args.device):
         logger.info(f"{args.device} autocast is available")
