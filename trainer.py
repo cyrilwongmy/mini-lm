@@ -10,6 +10,7 @@ This script provides comprehensive experiment tracking with:
 """
 
 import argparse
+import sys
 import os
 import time
 from pathlib import Path
@@ -173,10 +174,28 @@ def create_experiment_config(args: argparse.Namespace) -> ExperimentConfig:
     # If config file is provided, load it first
     if args.config:
         config = ExperimentConfig.load(Path(args.config))
-        # Override with command-line arguments
+
+        # Only override values that were explicitly provided on the CLI.
+        # Build a set of provided flag names mapped to argparse dest format.
+        provided_flags = set()
+        for tok in sys.argv[1:]:
+            if tok.startswith("--"):
+                name = tok[2:].split("=")[0]
+                provided_flags.add(name.replace("-", "_"))
+
+        # Map CLI dest names to ExperimentConfig attribute names when they differ
+        alias_map = {
+            "dataset_name": "dataset",
+            "experiment_tags": "tags",
+            "experiment_notes": "notes",
+        }
+
         for key, value in vars(args).items():
-            if hasattr(config, key) and value is not None:
-                setattr(config, key, value)
+            if key not in provided_flags:
+                continue
+            target = alias_map.get(key, key)
+            if hasattr(config, target) and value is not None:
+                setattr(config, target, value)
     else:
         # Create config from arguments
         config = ExperimentConfig(
