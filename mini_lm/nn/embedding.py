@@ -133,8 +133,12 @@ class RotaryPositionEmbedding(Module):
         # cos_cached and sin_cached have shape [max_positions, d_k]
         # token_positions has shape [..., seq_len]
         # We need to index into the first dimension of cos/sin_cached
-        cos = self.cos_cached[token_positions]  # [..., seq_len, d_k]
-        sin = self.sin_cached[token_positions]  # [..., seq_len, d_k]
+        cpu_token_positions = token_positions.to("cpu")
+        cos = self.cos_cached[cpu_token_positions]  # [..., seq_len, d_k]
+        sin = self.sin_cached[cpu_token_positions]  # [..., seq_len, d_k]
+
+        cos = cos.to(x.device)
+        sin = sin.to(x.device)
 
         # Apply rotary embedding
         # RoPE applies rotation to consecutive pairs: (x0,x1), (x2,x3), etc.
