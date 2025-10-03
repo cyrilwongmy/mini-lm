@@ -13,6 +13,8 @@ import argparse
 import sys
 import os
 import time
+import json
+import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -63,9 +65,9 @@ def parse_args():
     
     # Training arguments
     train_group = parser.add_argument_group("Training")
-    train_group.add_argument("--train-data", type=str, required=True,
+    train_group.add_argument("--train-data", type=str, required=False,
                             help="Path to training data (numpy array)")
-    train_group.add_argument("--val-data", type=str, required=True,
+    train_group.add_argument("--val-data", type=str, required=False,
                             help="Path to validation data (numpy array)")
     train_group.add_argument("--dataset-name", type=str, default="tinystories",
                             help="Name of the dataset for tracking")
@@ -220,6 +222,17 @@ def create_experiment_config(args: argparse.Namespace) -> ExperimentConfig:
             grad_clip=args.grad_clip,
             num_iterations=args.num_iterations,
             mixed_precision=args.mixed_precision,
+            beta1=args.beta1,
+            beta2=args.beta2,
+            eps=args.eps,
+            
+            # Data and device configuration
+            train_data=args.train_data,
+            val_data=args.val_data,
+            checkpoint_dir=args.checkpoint_dir,
+            use_mmap=args.use_mmap,
+            dtype=args.dtype,
+            device=args.device,
             
             # Experiment metadata
             experiment_type=args.experiment_type,
@@ -255,9 +268,10 @@ def get_dtype(dtype_str: str):
 def validate(
     model: nn.Module,
     val_data: np.ndarray,
-    args: argparse.Namespace,
+    config: ExperimentConfig,
     device: torch.device,
-    num_iterations: int
+    num_iterations: int,
+    val_batch_size: int
 ) -> Dict[str, float]:
     """Run validation and return metrics."""
     model.eval()
@@ -270,14 +284,14 @@ def validate(
         for _ in range(num_iterations):
             x, y = get_batch(
                 val_data,
-                args.val_batch_size,
-                args.context_length,
+                val_batch_size,
+                config.context_length,
                 device,
-                mmap_mode='r' if args.use_mmap else None,
-                dtype=get_dtype(args.dtype)
+                mmap_mode='r' if config.use_mmap else None,
+                dtype=get_dtype(config.dtype)
             )
             
-            if args.mixed_precision:
+            if config.mixed_precision:
                 with autocast():
                     logits = model(x, return_logits=True)
                     # Reshape for loss calculation
@@ -338,6 +352,12 @@ def train(args: argparse.Namespace):
     config = create_experiment_config(args)
     logger.info(f"Experiment configuration:\n{config}")
     
+    # Validate required fields
+    if not config.train_data:
+        raise ValueError("--train-data is required (either via CLI or config file)")
+    if not config.val_data:
+        raise ValueError("--val-data is required (either via CLI or config file)")
+    
     # Save config for reproducibility
     config_dir = Path("experiments/configs")
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -346,16 +366,16 @@ def train(args: argparse.Namespace):
     logger.info(f"Config saved to {config_path}")
     
     # Set device
-    device = torch.device(args.device)
+    device = torch.device(config.device)
     if device.type == "cuda":
         logger.info(f"Using GPU: {torch.cuda.get_device_name()}")
     else:
-        logger.info(f"Using {args.device}")
+        logger.info(f"Using {config.device}")
     
-    if torch.amp.autocast_mode.is_autocast_available(args.device):
-        logger.info(f"{args.device} autocast is available")
+    if torch.amp.autocast_mode.is_autocast_available(config.device):
+        logger.info(f"{config.device} autocast is available")
     else:
-        logger.info(f"{args.device} autocast is not available")
+        logger.info(f"{config.device} autocast is not available")
     
     # Create model
     logger.info("Creating model...")
@@ -371,7 +391,7 @@ def train(args: argparse.Namespace):
 
     
     # Compile model if mps or requested
-    if args.device == "mps":
+    if config.device == "mps":
         logger.info("Compiling model with torch.compile for MPS...")
         model = torch.compile(model, backend="aot_eager")
     elif args.compile and hasattr(torch, 'compile'):
@@ -411,24 +431,24 @@ def train(args: argparse.Namespace):
     
     # Load datasets
     logger.info("Loading datasets...")
-    train_data = args.train_data
-    val_data = args.val_data
+    train_data = config.train_data
+    val_data = config.val_data
     
     # Verify data can be loaded
-    if args.use_mmap:
+    if config.use_mmap:
         # Test loading with memmap
         test_batch = get_batch(
             train_data, 1, config.context_length, device,
-            mmap_mode='r', dtype=get_dtype(args.dtype)
+            mmap_mode='r', dtype=get_dtype(config.dtype)
         )
         logger.info(f"Successfully loaded training data with memmap")
     
     # Create checkpoint directory
-    checkpoint_dir = Path(args.checkpoint_dir)
+    checkpoint_dir = Path(config.checkpoint_dir)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     
     # Setup mixed precision
-    scaler = GradScaler() if args.mixed_precision else None
+    scaler = GradScaler() if config.mixed_precision else None
     
     # Loss function
     criterion = CrossEntropyLoss()
@@ -468,12 +488,12 @@ def train(args: argparse.Namespace):
                 config.batch_size,
                 config.context_length,
                 device,
-                mmap_mode='r' if args.use_mmap else None,
-                dtype=get_dtype(args.dtype)
+                mmap_mode='r' if config.use_mmap else None,
+                dtype=get_dtype(config.dtype)
             )
             
             # Forward pass
-            if args.mixed_precision:
+            if config.mixed_precision:
                 with autocast():
                     logits = model(x, return_logits=True)
                     # Reshape for loss calculation
@@ -499,7 +519,7 @@ def train(args: argparse.Namespace):
             accumulated_tokens += x.numel()
         
         # Gradient clipping and optimizer step
-        if args.mixed_precision:
+        if config.mixed_precision:
             scaler.unscale_(optimizer)
             grad_norm = clip_grad_norm_(model.parameters(), config.grad_clip)
             scaler.step(optimizer)
@@ -531,7 +551,7 @@ def train(args: argparse.Namespace):
             val_start_time = time.time()
             
             val_metrics = validate(
-                model, val_data, args, device, config.val_iterations
+                model, val_data, config, device, config.val_iterations, args.val_batch_size
             )
             
             val_time = time.time() - val_start_time

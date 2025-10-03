@@ -44,6 +44,14 @@ class ExperimentConfig:
     beta2: float = 0.999
     eps: float = 1e-8
     
+    # Data and device configuration
+    train_data: Optional[str] = None
+    val_data: Optional[str] = None
+    checkpoint_dir: str = "checkpoints"
+    use_mmap: bool = False
+    dtype: str = "int64"
+    device: str = "cuda"
+    
     # Experiment metadata
     experiment_type: str = "baseline"  # e.g., "baseline", "ablation", "hyperparameter_sweep"
     experiment_name: Optional[str] = None

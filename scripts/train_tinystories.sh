@@ -3,24 +3,10 @@
 
 # --- Configuration Variables ---
 CONFIG_FILE="experiments/configs/tinystories_512d_4L_16H.yaml"
-TRAIN_DATA="/Users/cyrilwong/github/mini_lm/data/TinyStories_train_token_ids.npy"
-VAL_DATA="/Users/cyrilwong/github/mini_lm/data/TinyStories_valid_token_ids.npy"
-NUM_ITERATIONS=5000
-CHECKPOINT_DIR="checkpoints/tinystories_512d_4L_16H_20M"
-DTYPE="int64"
-DEVICE="mps"
 
 # --- Run Training ---
 echo "Starting TinyStories model training..."
 
-uv run python trainer.py \
-    --config "${CONFIG_FILE}" \
-    --train-data "${TRAIN_DATA}" \
-    --val-data "${VAL_DATA}" \
-    --num-iterations "${NUM_ITERATIONS}" \
-    --checkpoint-dir "${CHECKPOINT_DIR}" \
-    --use-mmap \
-    --dtype "${DTYPE}" \
-    --device "${DEVICE}"
+uv run python trainer.py --config experiments/configs/tinystories_512d_4L_16H.yaml
 
 echo "Training script finished."
