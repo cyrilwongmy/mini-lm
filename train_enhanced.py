@@ -333,6 +333,11 @@ def train(args: argparse.Namespace):
     else:
         logger.info("Using CPU")
     
+    if torch.amp.autocast_mode.is_autocast_available(args.device):
+        logger.info(f"{args.device} autocast is available")
+    else:
+        logger.info(f"{args.device} autocast is not available")
+    
     # Create model
     logger.info("Creating model...")
     model = Transformer(
