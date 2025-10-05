@@ -1,6 +1,6 @@
 # Configuration for TinyStories model training
 # Model: 512d, 4 layers, 16 heads
-# Target: ~40,000,000 tokens processed
+# Target: ~40,000,000 tokens processed, validation loss between 1.45 to 2.00
 
 # Model architecture
 model_name: "mini-lm"
