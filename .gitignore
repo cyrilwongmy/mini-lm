@@ -175,3 +175,6 @@ data/
 
 local_docs/*
 local_devs/*
+
+wandb/*
+checkpoints/*
