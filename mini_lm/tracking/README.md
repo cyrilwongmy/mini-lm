@@ -120,19 +120,6 @@ config = ExperimentConfig.load("config.yaml")
 - `memory/gpu_*_allocated_gb`: GPU memory usage
 - `memory/system_memory_percent`: System RAM usage
 
-## Integration with train_enhanced.py
-
-The enhanced training script automatically uses this tracking module:
-
-```bash
-python train_enhanced.py \
-    --train-data data/train.npy \
-    --val-data data/val.npy \
-    --experiment-name "my_experiment" \
-    --model-size "17M" \
-    --track-memory
-```
-
 ## W&B Dashboard Features
 
 When using this tracking module, your W&B dashboard will show:
