@@ -1,7 +1,8 @@
 from .linear import Linear
 from .embedding import Embedding, RotaryPositionEmbedding
 from .normalization import RMSNorm
-from .activation import Softmax, SwiGLU
+from .activation import Softmax, SiLU
+from .ffn import FeedForwardSiLU, FeedForwardSwiGLU
 from .attention import ScaledDotProductAttention, MultiHeadAttention, MultiHeadAttentionWithRope
 from .transformer import TransformerBlock, Transformer
 from .loss import CrossEntropyLoss

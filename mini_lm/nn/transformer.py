@@ -1,5 +1,12 @@
 from torch.nn import Module, ModuleList
-from . import MultiHeadAttentionWithRope, SwiGLU, RMSNorm, Embedding, Linear, Softmax
+from . import (
+    MultiHeadAttentionWithRope,
+    FeedForwardSiLU,
+    RMSNorm,
+    Embedding,
+    Linear,
+    Softmax,
+)
 
 
 class TransformerBlock(Module):
@@ -10,7 +17,7 @@ class TransformerBlock(Module):
         self.attention = MultiHeadAttentionWithRope(
             d_model, num_heads, max_seq_len, theta
         )
-        self.ffn = SwiGLU(d_model, d_ff)
+        self.ffn = FeedForwardSiLU(d_model, d_ff)
         self.norm1 = RMSNorm(d_model)
         self.norm2 = RMSNorm(d_model)
 
@@ -51,16 +58,18 @@ class Transformer(Module):
         self.rope_theta = rope_theta
 
         self.embedding = Embedding(vocab_size, self.d_model)
-        self.layers = ModuleList([
-            TransformerBlock(
-                d_model=self.d_model,
-                num_heads=self.num_heads,
-                d_ff=self.d_ff,
-                max_seq_len=context_length,
-                theta=self.rope_theta
-            )
-            for _ in range(num_layers)
-        ])
+        self.layers = ModuleList(
+            [
+                TransformerBlock(
+                    d_model=self.d_model,
+                    num_heads=self.num_heads,
+                    d_ff=self.d_ff,
+                    max_seq_len=context_length,
+                    theta=self.rope_theta,
+                )
+                for _ in range(num_layers)
+            ]
+        )
         self.norm = RMSNorm(self.d_model)
         self.linear = Linear(self.d_model, vocab_size)
         self.softmax = Softmax(dim=-1)
