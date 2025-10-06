@@ -1,7 +1,7 @@
 from torch.nn import Module, ModuleList
 from . import (
     MultiHeadAttentionWithRope,
-    FeedForwardSiLU,
+    FeedForwardSwiGLU,
     RMSNorm,
     Embedding,
     Linear,
@@ -17,7 +17,7 @@ class TransformerBlock(Module):
         self.attention = MultiHeadAttentionWithRope(
             d_model, num_heads, max_seq_len, theta
         )
-        self.ffn = FeedForwardSiLU(d_model, d_ff)
+        self.ffn = FeedForwardSwiGLU(d_model, d_ff)
         self.norm1 = RMSNorm(d_model)
         self.norm2 = RMSNorm(d_model)
 
